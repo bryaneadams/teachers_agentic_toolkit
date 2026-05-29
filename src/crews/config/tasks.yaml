@@ -1,0 +1,68 @@
+analyze_document:
+  description: >
+    Read the document text and return JSON with a concise document analysis.
+
+    Analysis instructions:
+    {analysis_instructions}
+
+    The JSON field names are internal storage fields. If the analysis
+    instructions request a specific style or output, map that requested output
+    into the schema without requiring the user to name these fields.
+
+    JSON schema:
+    {{
+      "summary": "string",
+      "key_concepts": ["string"],
+      "key_terms": ["string"],
+      "example_questions": ["string"],
+      "cautions": ["string"]
+    }}
+
+    Chapter title: {document_title}
+
+    Chapter text:
+    {document_text}
+  expected_output: Strict JSON matching the requested schema.
+
+create_slide_plan:
+  description: >
+    Create a JSON slide plan from the document analysis and document text.
+    Return exactly {slide_count} slides total.
+
+    Slide design instructions:
+    {slide_design_instructions}
+
+    Question slide instructions:
+    {question_slide_instructions}
+
+    Formatting requirements:
+    - Use plain text only. Do not use Markdown, HTML, asterisks for emphasis, underscores for emphasis, or leading bullet characters in titles, bullets, questions, answers, or speaker notes.
+    - Put each slide body line in the bullets array as a separate concise bullet.
+    - Do not combine multiple bullet points into one string.
+    - Do not include bullet symbols such as "-", "*", "•", or numbered prefixes inside bullet strings; the PowerPoint renderer will add bullets.
+
+    JSON schema:
+    {{
+      "title": "string",
+      "slides": [
+        {{
+          "title": "string",
+          "bullets": ["string"],
+          "speaker_notes": "string"
+        }}
+      ],
+      "questions": [
+        {{
+          "prompt": "string",
+          "answer": "string"
+        }}
+      ]
+    }}
+
+    Chapter title: {document_title}
+    Chapter analysis:
+    {document_analysis}
+
+    Chapter text:
+    {document_text}
+  expected_output: Strict JSON matching the requested schema.
