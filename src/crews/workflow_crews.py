@@ -13,6 +13,8 @@ from tools.context_chunking import chunk_text_for_llm
 
 DEFAULT_ANALYSIS_AGENT_ID = "instructional_content_analyst"
 CUSTOM_ANALYSIS_AGENT_ID = "custom_document_analyst"
+DEFAULT_SLIDE_DESIGN_AGENT_ID = "slide_designer"
+CUSTOM_SLIDE_DESIGN_AGENT_ID = "custom_slide_designer"
 
 
 @dataclass(frozen=True)
@@ -205,7 +207,7 @@ class SlideDeckPlanningCrew(WorkflowCrew):
         label="Slide deck planning",
         description="Create a classroom slide deck from document analysis.",
         operations=("create_slide_deck",),
-        agent_ids=("slide_designer",),
+        agent_ids=(DEFAULT_SLIDE_DESIGN_AGENT_ID, CUSTOM_SLIDE_DESIGN_AGENT_ID),
         task_ids=("create_slide_plan",),
     )
 
@@ -214,8 +216,11 @@ class SlideDeckPlanningCrew(WorkflowCrew):
         document: Document,
         analysis: DocumentAnalysis,
         slide_count: int,
-        question_count: int,
+        question_count: int | None = None,
         llm_profile: str | None = None,
+        slide_design_agent_id: str = DEFAULT_SLIDE_DESIGN_AGENT_ID,
+        slide_design_agent_goal: str | None = None,
+        slide_design_agent_backstory: str | None = None,
     ) -> SlideDeck:
         """Create a slide deck from a document and prior analysis.
 
@@ -223,8 +228,15 @@ class SlideDeckPlanningCrew(WorkflowCrew):
             document (Document): Source document to plan from.
             analysis (DocumentAnalysis): Previously generated document analysis.
             slide_count (int): Number of slides to create.
-            question_count (int): Number of question slides to create.
+            question_count (int | None, optional): Number of question slides to create.
+                Defaults to None.
             llm_profile (str | None, optional): Named LLM profile to use, or None for the default profile.
+                Defaults to None.
+            slide_design_agent_id (str, optional): Agent profile ID from `agents.yaml`.
+                Defaults to "slide_designer".
+            slide_design_agent_goal (str | None, optional): Goal text for the customizable slide designer.
+                Defaults to None.
+            slide_design_agent_backstory (str | None, optional): Backstory text for the customizable slide designer.
                 Defaults to None.
 
         Returns:
@@ -239,12 +251,22 @@ class SlideDeckPlanningCrew(WorkflowCrew):
         )
 
         llm = self._crewai_llm(llm_profile)
-        designer = self._build_agent("slide_designer", llm)
+        agent_inputs = _slide_design_agent_inputs(
+            slide_design_agent_id=slide_design_agent_id,
+            slide_design_agent_goal=slide_design_agent_goal,
+            slide_design_agent_backstory=slide_design_agent_backstory,
+        )
+        designer = self._build_agent(slide_design_agent_id, llm, agent_inputs)
         task_template = task_config["create_slide_plan"]
         task = Task(
             description=task_template["description"].format(
                 slide_count=slide_count,
-                question_count=question_count,
+                question_slide_instructions=_question_slide_instructions(question_count),
+                slide_design_instructions=_slide_design_instructions(
+                    slide_design_agent_id=slide_design_agent_id,
+                    slide_design_agent_goal=slide_design_agent_goal,
+                    slide_design_agent_backstory=slide_design_agent_backstory,
+                ),
                 document_title=document.title,
                 document_analysis=_analysis_to_json(analysis),
                 document_text=chunked_context.text,
@@ -266,7 +288,7 @@ class SlideDeckPlanningCrew(WorkflowCrew):
                     str(result),
                     fallback_title=document.title,
                     slide_count=slide_count,
-                    question_count=question_count,
+                    question_count=question_count or 0,
                 ),
                 used_llm=True,
             )
@@ -297,7 +319,8 @@ class DocumentSlidePlanningCrew(WorkflowCrew):
             DEFAULT_ANALYSIS_AGENT_ID,
             "general_document_analyst",
             CUSTOM_ANALYSIS_AGENT_ID,
-            "slide_designer",
+            DEFAULT_SLIDE_DESIGN_AGENT_ID,
+            CUSTOM_SLIDE_DESIGN_AGENT_ID,
         ),
         task_ids=("analyze_document", "create_slide_plan"),
     )
@@ -306,18 +329,22 @@ class DocumentSlidePlanningCrew(WorkflowCrew):
         self,
         document: Document,
         slide_count: int,
-        question_count: int,
+        question_count: int | None = None,
         llm_profile: str | None = None,
         analysis_agent_id: str = DEFAULT_ANALYSIS_AGENT_ID,
         analysis_agent_goal: str | None = None,
         analysis_agent_backstory: str | None = None,
+        slide_design_agent_id: str = DEFAULT_SLIDE_DESIGN_AGENT_ID,
+        slide_design_agent_goal: str | None = None,
+        slide_design_agent_backstory: str | None = None,
     ) -> SlideDeck:
         """Analyze a document and create a slide deck.
 
         Args:
             document (Document): Source document to process.
             slide_count (int): Number of slides to create.
-            question_count (int): Number of question slides to create.
+            question_count (int | None, optional): Number of question slides to create.
+                Defaults to None.
             llm_profile (str | None, optional): Named LLM profile to use, or None for the default profile.
                 Defaults to None.
             analysis_agent_id (str, optional): Agent profile ID from `agents.yaml`.
@@ -325,6 +352,12 @@ class DocumentSlidePlanningCrew(WorkflowCrew):
             analysis_agent_goal (str | None, optional): Goal text for the customizable analysis agent.
                 Defaults to None.
             analysis_agent_backstory (str | None, optional): Backstory text for the customizable analysis agent.
+                Defaults to None.
+            slide_design_agent_id (str, optional): Agent profile ID from `agents.yaml`.
+                Defaults to "slide_designer".
+            slide_design_agent_goal (str | None, optional): Goal text for the customizable slide designer.
+                Defaults to None.
+            slide_design_agent_backstory (str | None, optional): Backstory text for the customizable slide designer.
                 Defaults to None.
 
         Returns:
@@ -343,6 +376,9 @@ class DocumentSlidePlanningCrew(WorkflowCrew):
             slide_count=slide_count,
             question_count=question_count,
             llm_profile=llm_profile,
+            slide_design_agent_id=slide_design_agent_id,
+            slide_design_agent_goal=slide_design_agent_goal,
+            slide_design_agent_backstory=slide_design_agent_backstory,
         )
 
     def analyze_document(
@@ -382,8 +418,11 @@ class DocumentSlidePlanningCrew(WorkflowCrew):
         document: Document,
         analysis: DocumentAnalysis,
         slide_count: int,
-        question_count: int,
+        question_count: int | None = None,
         llm_profile: str | None = None,
+        slide_design_agent_id: str = DEFAULT_SLIDE_DESIGN_AGENT_ID,
+        slide_design_agent_goal: str | None = None,
+        slide_design_agent_backstory: str | None = None,
     ) -> SlideDeck:
         """Create a slide deck using the slide deck planning crew.
 
@@ -391,8 +430,15 @@ class DocumentSlidePlanningCrew(WorkflowCrew):
             document (Document): Source document to plan from.
             analysis (DocumentAnalysis): Previously generated document analysis.
             slide_count (int): Number of slides to create.
-            question_count (int): Number of question slides to create.
+            question_count (int | None, optional): Number of question slides to create.
+                Defaults to None.
             llm_profile (str | None, optional): Named LLM profile to use, or None for the default profile.
+                Defaults to None.
+            slide_design_agent_id (str, optional): Agent profile ID from `agents.yaml`.
+                Defaults to "slide_designer".
+            slide_design_agent_goal (str | None, optional): Goal text for the customizable slide designer.
+                Defaults to None.
+            slide_design_agent_backstory (str | None, optional): Backstory text for the customizable slide designer.
                 Defaults to None.
 
         Returns:
@@ -404,6 +450,9 @@ class DocumentSlidePlanningCrew(WorkflowCrew):
             slide_count=slide_count,
             question_count=question_count,
             llm_profile=llm_profile,
+            slide_design_agent_id=slide_design_agent_id,
+            slide_design_agent_goal=slide_design_agent_goal,
+            slide_design_agent_backstory=slide_design_agent_backstory,
         )
 
 
@@ -699,11 +748,96 @@ def _analysis_instructions(
         return (
             f"Goal: {analysis_agent_goal}\n"
             f"Backstory: {analysis_agent_backstory}\n"
-            "Follow this custom analyst profile while still returning the required JSON schema."
+            "Follow this custom analyst profile as the primary instruction. "
+            "The user does not know the JSON field names, so map their requested output into the schema yourself. "
+            "Put the main requested response in `summary`. "
+            "Use `key_concepts`, `key_terms`, `example_questions`, and `cautions` only when they naturally support the request; otherwise return empty arrays for those fields."
         )
     if analysis_agent_id == DEFAULT_ANALYSIS_AGENT_ID:
         return "Extract teachable concepts that can support instructional workflows."
     return "Follow the selected analyst profile while returning the required JSON schema."
+
+
+def _slide_design_agent_inputs(
+    slide_design_agent_id: str,
+    slide_design_agent_goal: str | None,
+    slide_design_agent_backstory: str | None,
+) -> dict[str, str]:
+    """Build placeholder values for slide design agent profiles.
+
+    Args:
+        slide_design_agent_id (str): Selected slide design agent profile ID.
+        slide_design_agent_goal (str | None): Goal text from the UI.
+        slide_design_agent_backstory (str | None): Backstory text from the UI.
+
+    Raises:
+        OrchestrationError: If the custom slide designer is selected without required text.
+
+    Returns:
+        dict[str, str]: Placeholder values for formatting agent profile fields.
+    """
+    if slide_design_agent_id == CUSTOM_SLIDE_DESIGN_AGENT_ID and (
+        not slide_design_agent_goal or not slide_design_agent_backstory
+    ):
+        raise OrchestrationError(
+            "custom_slide_designer requires slide_design_agent_goal and slide_design_agent_backstory."
+        )
+
+    return {
+        "slide_design_agent_goal": slide_design_agent_goal or "",
+        "slide_design_agent_backstory": slide_design_agent_backstory or "",
+    }
+
+
+def _slide_design_instructions(
+    slide_design_agent_id: str,
+    slide_design_agent_goal: str | None,
+    slide_design_agent_backstory: str | None,
+) -> str:
+    """Build task instructions for the selected slide design agent.
+
+    Args:
+        slide_design_agent_id (str): Selected slide design agent profile ID.
+        slide_design_agent_goal (str | None): Goal text from the UI.
+        slide_design_agent_backstory (str | None): Backstory text from the UI.
+
+    Returns:
+        str: Instructions inserted into the slide design task prompt.
+    """
+    if slide_design_agent_id == CUSTOM_SLIDE_DESIGN_AGENT_ID:
+        return (
+            f"Goal: {slide_design_agent_goal}\n"
+            f"Backstory: {slide_design_agent_backstory}\n"
+            "Follow this custom slide designer profile as the primary design instruction. "
+            "The user does not know the JSON field names, so map their requested slide style, tone, structure, and constraints into the required slide schema yourself."
+        )
+    if slide_design_agent_id == DEFAULT_SLIDE_DESIGN_AGENT_ID:
+        return "Create classroom-ready slides with concise plain-text titles, bullets, speaker notes, and question slides."
+    return "Follow the selected slide designer profile while returning the required slide JSON schema."
+
+
+def _question_slide_instructions(question_count: int | None) -> str:
+    """Build question slide instructions for slide planning.
+
+    Args:
+        question_count (int | None): Requested number of question slides.
+
+    Returns:
+        str: Prompt instructions for question slide handling.
+    """
+    if not question_count or question_count <= 0:
+        return (
+            "No question slides are required. Return an empty questions array unless "
+            "the slide design instructions explicitly ask for questions."
+        )
+
+    return (
+        f"Create exactly {question_count} example questions. "
+        f"The final {question_count} slides must be question slides. "
+        "Each question slide should have a title like \"Question 1\", put the question "
+        "prompt in the first bullet, and put a concise answer or teaching cue in the second bullet. "
+        "Earlier slides should teach or present the document concepts in sequence."
+    )
 
 
 def _format_agent_field(value: str, inputs: dict[str, str], agent_id: str) -> str:

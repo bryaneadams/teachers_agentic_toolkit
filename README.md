@@ -248,6 +248,7 @@ Some tools delegate LLM work to crew workflows. For the default slide deck path:
 - `analyze_document` uses `analysis_crew_id`.
 - `analyze_document` uses `analysis_agent_id` to choose the agent profile inside `agents.yaml`.
 - `create_slide_deck` uses `deck_planning_crew_id`.
+- `create_slide_deck` uses `slide_design_agent_id` to choose the slide designer profile inside `agents.yaml`.
 
 Example:
 
@@ -262,6 +263,7 @@ result = run(
     analysis_crew_id="document_analysis",
     analysis_agent_id="instructional_content_analyst",
     deck_planning_crew_id="slide_deck_planning",
+    slide_design_agent_id="slide_designer",
 )
 ```
 
@@ -282,12 +284,34 @@ context = run(
     document_path="path/to/document.md",
     workflow_order=("ingest_document", "analyze_document"),
     analysis_agent_id="custom_document_analyst",
-    analysis_agent_goal="Identify claims, evidence, risks, and open questions for a policy review.",
-    analysis_agent_backstory="You are a policy analyst who summarizes dense documents for decision makers.",
+    analysis_agent_goal="Make two funny puns based on the document.",
+    analysis_agent_backstory="You are a math nerd who writes concise math jokes from source material.",
 )
 ```
 
-The `custom_document_analyst` profile lives in `src/crews/config/agents.yaml` and uses `{analysis_agent_goal}` and `{analysis_agent_backstory}` placeholders. To add another fixed analysis profile, add an entry to `agents.yaml` and pass that YAML key as `analysis_agent_id`.
+The user does not need to know internal output fields such as `summary`. The analysis task maps the requested output into the `DocumentAnalysis` schema. The `custom_document_analyst` profile lives in `src/crews/config/agents.yaml` and uses `{analysis_agent_goal}` and `{analysis_agent_backstory}` placeholders. To add another fixed analysis profile, add an entry to `agents.yaml` and pass that YAML key as `analysis_agent_id`.
+
+For a UI-defined slide designer, use `custom_slide_designer` and pass the goal and backstory from UI fields:
+
+```python
+result = run(
+    document_path="path/to/document.md",
+    output_path="out/deck.pptx",
+    slide_count=6,
+    question_count=2,
+    workflow_order=(
+        "ingest_document",
+        "analyze_document",
+        "create_slide_deck",
+        "render_powerpoint",
+    ),
+    slide_design_agent_id="custom_slide_designer",
+    slide_design_agent_goal="Create funny, fast-paced review slides with one joke per slide.",
+    slide_design_agent_backstory="You are a math teacher who uses playful slide titles and short punchy examples.",
+)
+```
+
+The user does not need to know the slide JSON fields. The slide planning task maps the requested style, tone, structure, and constraints into the `SlideDeck` schema. The `custom_slide_designer` profile lives in `src/crews/config/agents.yaml` and uses `{slide_design_agent_goal}` and `{slide_design_agent_backstory}` placeholders.
 
 For a future report workflow, the ordered tools might look like:
 

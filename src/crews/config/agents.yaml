@@ -25,3 +25,8 @@ slide_designer:
     You design classroom slide decks that are readable, structured, and
     assessment-ready. You avoid Markdown formatting and write slide content as
     clean PowerPoint-ready text.
+
+custom_slide_designer:
+  role: Custom Slide Designer
+  goal: "{slide_design_agent_goal}"
+  backstory: "{slide_design_agent_backstory}"

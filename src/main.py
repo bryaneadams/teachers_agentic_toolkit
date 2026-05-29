@@ -11,6 +11,7 @@ from crews.workflow_crews import (
     DEFAULT_ANALYSIS_AGENT_ID,
     DEFAULT_ANALYSIS_CREW_ID,
     DEFAULT_DECK_PLANNING_CREW_ID,
+    DEFAULT_SLIDE_DESIGN_AGENT_ID,
     CrewRegistry,
     build_crew_registry,
 )
@@ -38,6 +39,9 @@ class WorkflowState(BaseModel):
     analysis_agent_backstory: str | None = None
     analysis_crew_id: str = DEFAULT_ANALYSIS_CREW_ID
     deck_planning_crew_id: str = DEFAULT_DECK_PLANNING_CREW_ID
+    slide_design_agent_id: str = DEFAULT_SLIDE_DESIGN_AGENT_ID
+    slide_design_agent_goal: str | None = None
+    slide_design_agent_backstory: str | None = None
     config: WorkflowConfig | None = None
     crew_registry: CrewRegistry | None = None
     document: Document | None = None
@@ -169,8 +173,11 @@ class CreateSlideDeckTool(Tool):
             document=state.document,
             analysis=input_value,
             slide_count=state.slide_count,
-            question_count=state.question_count or 0,
+            question_count=state.question_count,
             llm_profile=state.llm_profile,
+            slide_design_agent_id=state.slide_design_agent_id,
+            slide_design_agent_goal=state.slide_design_agent_goal,
+            slide_design_agent_backstory=state.slide_design_agent_backstory,
         )
         state.deck = deck
         return deck
@@ -349,6 +356,9 @@ def run(
     analysis_agent_backstory: str | None = None,
     analysis_crew_id: str = DEFAULT_ANALYSIS_CREW_ID,
     deck_planning_crew_id: str = DEFAULT_DECK_PLANNING_CREW_ID,
+    slide_design_agent_id: str = DEFAULT_SLIDE_DESIGN_AGENT_ID,
+    slide_design_agent_goal: str | None = None,
+    slide_design_agent_backstory: str | None = None,
     crew_registry: CrewRegistry | None = None,
     workflow_order: str | Sequence[str] | None = None,
     workflow: Workflow | None = None,
@@ -369,6 +379,9 @@ def run(
         analysis_agent_backstory=analysis_agent_backstory,
         analysis_crew_id=analysis_crew_id,
         deck_planning_crew_id=deck_planning_crew_id,
+        slide_design_agent_id=slide_design_agent_id,
+        slide_design_agent_goal=slide_design_agent_goal,
+        slide_design_agent_backstory=slide_design_agent_backstory,
         crew_registry=crew_registry or build_crew_registry(),
     )
 
