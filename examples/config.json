@@ -1,0 +1,39 @@
+{
+  "default_llm": "openai_fast",
+  "env_file": ".env",
+  "orchestration": {
+    "verbose": false
+  },
+  "llms": {
+    "openai_fast": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "temperature": 0.2,
+      "api_key_env": "OPENAI_API_KEY"
+    },
+    "anthropic_sonnet": {
+      "provider": "anthropic",
+      "model": "claude-3-7-sonnet-latest",
+      "temperature": 0.2,
+      "api_key_env": "ANTHROPIC_API_KEY"
+    },
+    "gemini_flash": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "temperature": 0.2,
+      "api_key_env": "GOOGLE_API_KEY"
+    },
+    "groq_llama": {
+      "provider": "groq",
+      "model": "llama-3.1-70b-versatile",
+      "temperature": 0.2,
+      "api_key_env": "GROQ_API_KEY"
+    },
+    "ollama_local": {
+      "provider": "ollama",
+      "model": "llama3.1",
+      "temperature": 0.1,
+      "base_url": "http://localhost:11434"
+    }
+  }
+}
